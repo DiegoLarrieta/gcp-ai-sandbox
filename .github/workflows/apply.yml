@@ -1,0 +1,61 @@
+# Despliegue real. Desactivado hasta el Sprint 2, cuando exista la
+# organización de GCP y el bootstrap esté aplicado (ver stages/0-bootstrap).
+#
+# Para activarlo:
+#   1. Guarda en GitHub las variables del repo:
+#      WIF_PROVIDER            output wif_provider de 0-bootstrap
+#      STAGE_SERVICE_ACCOUNTS  JSON con el correo de cada etapa, por ejemplo
+#                              {"1-org": "sa-org@...", "5-sandboxes": "sa-sandboxes@..."}
+#   2. Crea el environment "plataforma" con revisores obligatorios.
+#   3. Cambia APPLY_ENABLED a 'true'.
+name: Apply
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: Etapa a desplegar
+        required: true
+        type: choice
+        options: [1-org, 2-security, 3-networks, 4-ai-platform, 5-sandboxes]
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  TF_VERSION: 1.11.4
+  APPLY_ENABLED: "false"
+
+jobs:
+  apply:
+    name: Apply ${{ inputs.stage || '5-sandboxes' }}
+    runs-on: ubuntu-latest
+    environment: plataforma
+    steps:
+      - name: Despliegue desactivado
+        if: env.APPLY_ENABLED != 'true'
+        run: echo "::notice::El despliegue real se activa en el Sprint 2."
+
+      - uses: actions/checkout@v4
+        if: env.APPLY_ENABLED == 'true'
+
+      - uses: google-github-actions/auth@v2
+        if: env.APPLY_ENABLED == 'true'
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ fromJSON(vars.STAGE_SERVICE_ACCOUNTS)[inputs.stage || '5-sandboxes'] }}
+
+      - uses: hashicorp/setup-terraform@v3
+        if: env.APPLY_ENABLED == 'true'
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: terraform apply
+        if: env.APPLY_ENABLED == 'true'
+        working-directory: stages/${{ inputs.stage || '5-sandboxes' }}
+        run: |
+          terraform init -input=false
+          terraform apply -input=false -auto-approve

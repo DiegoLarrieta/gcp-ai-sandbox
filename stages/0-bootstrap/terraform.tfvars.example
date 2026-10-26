@@ -1,0 +1,10 @@
+# Copia este archivo como terraform.tfvars y llena los valores reales.
+# terraform.tfvars está en .gitignore: no lo subas al repo.
+
+org_id          = "123456789012"
+billing_account = "000000-AAAAAA-BBBBBB"
+prefix          = "acme"
+region          = "us-central1"
+github_repo     = "DiegoLarrieta/gcp-ai-sandbox"
+owner           = "gcp-ai-plataforma@empresa.com"
+cost_center     = "plataforma"

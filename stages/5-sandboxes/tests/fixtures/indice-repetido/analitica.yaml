@@ -1,0 +1,11 @@
+team: analitica
+owner_group: gcp-ai-analitica@empresa.com
+cost_center: cc-1042
+expires: 2027-03-31
+monthly_budget_usd: 3000
+network_index: 0
+gpu_quota:
+  nvidia-l4: 4
+  nvidia-a100: 1
+allowed_services: [workbench, vertex-training, vertex-endpoints, vector-search]
+data_access: [curated/ventas, curated/clientes_anon]

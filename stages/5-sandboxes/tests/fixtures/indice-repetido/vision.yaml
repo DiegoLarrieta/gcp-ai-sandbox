@@ -1,0 +1,10 @@
+team: vision
+owner_group: gcp-ai-vision@empresa.com
+cost_center: cc-2001
+expires: 2027-01-15
+monthly_budget_usd: 1500
+network_index: 0
+gpu_quota:
+  nvidia-l4: 2
+allowed_services: [workbench, gke-gpu]
+data_access: [curated/imagenes]

@@ -1,0 +1,7 @@
+team: pruebas
+owner_group: gcp-ai-pruebas@empresa.com
+cost_center: cc-9999
+monthly_budget_usd: 500
+network_index: 5
+allowed_services: [workbench]
+data_access: []

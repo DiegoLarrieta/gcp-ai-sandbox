@@ -1,0 +1,15 @@
+# Cuando exista la organización de GitHub, cambia @DiegoLarrieta por los
+# equipos, por ejemplo @org/plataforma y @org/analitica.
+
+# Base y plataforma: revisa el equipo de plataforma.
+*                                   @DiegoLarrieta
+/modules/                           @DiegoLarrieta
+/stages/0-bootstrap/                @DiegoLarrieta
+/stages/1-org/                      @DiegoLarrieta
+/stages/2-security/                 @DiegoLarrieta
+/stages/3-networks/                 @DiegoLarrieta
+/stages/4-ai-platform/              @DiegoLarrieta
+/policies/                          @DiegoLarrieta
+
+# Cada equipo es dueño de su archivo de sandbox.
+/stages/5-sandboxes/teams/analitica.yaml  @DiegoLarrieta
