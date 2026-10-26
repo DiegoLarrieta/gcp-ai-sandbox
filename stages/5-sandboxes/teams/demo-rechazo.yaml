@@ -1,0 +1,12 @@
+# PR de prueba para el hito del Sprint 1: este sandbox NO debe aprobarse.
+# Le falta expires, pide H100 sin aprobación y quiere leer la zona raw.
+# No se debe hacer merge; se cierra después de capturar la evidencia.
+team: demo-rechazo
+owner_group: gcp-ai-demo@empresa.com
+cost_center: cc-0000
+monthly_budget_usd: 800
+network_index: 9
+gpu_quota:
+  nvidia-h100: 1
+allowed_services: [workbench]
+data_access: [raw/clientes]
