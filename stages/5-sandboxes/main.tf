@@ -58,6 +58,7 @@ locals {
 }
 
 resource "google_project" "sandbox" {
+  # checkov:skip=CKV2_GCP_5:La auditoría de Data Access se configura una vez a nivel organización en la etapa 1-org y la heredan todos los sandboxes.
   for_each = local.teams
 
   name                = "aisbx-${each.key}"

@@ -1,0 +1,18 @@
+# Proyectos que Infracost estima desde el código, sin credenciales de GCP.
+version: 0.1
+
+projects:
+  - path: stages/0-bootstrap
+    name: 0-bootstrap
+    terraform_vars:
+      org_id: "123456789012"
+      billing_account: "000000-AAAAAA-BBBBBB"
+      prefix: "acme"
+      github_repo: "DiegoLarrieta/gcp-ai-sandbox"
+
+  - path: stages/5-sandboxes
+    name: 5-sandboxes
+    terraform_vars:
+      prefix: "acme"
+      billing_account: "000000-AAAAAA-BBBBBB"
+      folder_id: "folders/444444444444"

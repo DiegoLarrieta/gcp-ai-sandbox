@@ -65,8 +65,18 @@ run "wif_solo_acepta_el_repo_del_proyecto" {
   command = plan
 
   assert {
-    condition     = google_iam_workload_identity_pool_provider.github.attribute_condition == "assertion.repository == 'DiegoLarrieta/gcp-ai-sandbox'"
-    error_message = "WIF debe aceptar solo tokens del repo del proyecto."
+    condition     = google_iam_workload_identity_pool_provider.github.attribute_condition == "assertion.sub == 'repo:DiegoLarrieta/gcp-ai-sandbox:ref:refs/heads/main' || assertion.sub == 'repo:DiegoLarrieta/gcp-ai-sandbox:pull_request'"
+    error_message = "WIF debe aceptar solo tokens del repo del proyecto, desde main o desde un PR."
+  }
+
+  assert {
+    condition     = strcontains(google_iam_workload_identity_pool_provider.github.attribute_condition, "assertion.sub == 'repo:DiegoLarrieta/gcp-ai-sandbox:ref:refs/heads/main'")
+    error_message = "WIF debe limitar las credenciales a la rama main y a los PR."
+  }
+
+  assert {
+    condition     = !strcontains(google_iam_workload_identity_pool_provider.github.attribute_condition, "*")
+    error_message = "La condición de WIF no debe usar comodines."
   }
 
   assert {
@@ -130,16 +140,44 @@ run "etiquetas_obligatorias" {
   }
 }
 
-run "apply_completo_con_mocks" {
-  command = apply
+# La llave KMS tiene prevent_destroy, así que un run con command = apply
+# no podría limpiarse al terminar. En su lugar se fijan los valores
+# calculados durante el plan para poder revisar los outputs completos.
+run "outputs_con_valores_fijos" {
+  command = plan
+
+  override_resource {
+    target          = random_id.suffix
+    override_during = plan
+    values = {
+      hex = "abcd"
+    }
+  }
+
+  override_resource {
+    target          = google_iam_workload_identity_pool_provider.github
+    override_during = plan
+    values = {
+      name = "projects/222222222222/locations/global/workloadIdentityPools/github/providers/github-actions"
+    }
+  }
+
+  override_resource {
+    target          = google_service_account.stage
+    override_during = plan
+    values = {
+      name  = "projects/acme-seed-abcd/serviceAccounts/sa-mock@acme-seed-abcd.iam.gserviceaccount.com"
+      email = "sa-mock@acme-seed-abcd.iam.gserviceaccount.com"
+    }
+  }
 
   assert {
-    condition     = startswith(output.seed_project_id, "acme-seed-")
+    condition     = output.seed_project_id == "acme-seed-abcd"
     error_message = "El proyecto semilla debe seguir la convención de nombres."
   }
 
   assert {
-    condition     = startswith(output.tfstate_bucket, "acme-tfstate-")
+    condition     = output.tfstate_bucket == "acme-tfstate-abcd"
     error_message = "El bucket de estado debe seguir la convención de nombres."
   }
 

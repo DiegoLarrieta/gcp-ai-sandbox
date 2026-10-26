@@ -35,7 +35,7 @@ gcp-ai-sandbox/
 
 | Herramienta | Versión |
 |---|---|
-| Terraform | 1.9 o superior (mocks requieren 1.7+) |
+| Terraform | 1.11 o superior para correr las pruebas (el código acepta 1.9+) |
 | tflint | 0.54+ |
 | checkov | 3.x |
 | conftest | 0.56+ |

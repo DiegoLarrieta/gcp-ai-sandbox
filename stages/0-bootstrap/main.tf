@@ -99,6 +99,24 @@ resource "google_project" "seed" {
   labels              = local.labels
 }
 
+# Auditoría de lectura y escritura de datos en el proyecto semilla: registra
+# quién lee o modifica el estado de Terraform. Cubre también el acceso al
+# bucket, por eso no se activa el access logging del bucket (CKV_GCP_62).
+resource "google_project_iam_audit_config" "seed" {
+  project = google_project.seed.project_id
+  service = "allServices"
+
+  audit_log_config {
+    log_type = "ADMIN_READ"
+  }
+  audit_log_config {
+    log_type = "DATA_READ"
+  }
+  audit_log_config {
+    log_type = "DATA_WRITE"
+  }
+}
+
 resource "google_project_service" "seed" {
   for_each = toset(local.seed_services)
 
@@ -123,6 +141,11 @@ resource "google_kms_crypto_key" "tfstate" {
   rotation_period = "7776000s" # 90 días
   purpose         = "ENCRYPT_DECRYPT"
   labels          = local.labels
+
+  # Destruir la llave dejaría ilegible todo el estado.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 data "google_storage_project_service_account" "gcs" {
@@ -140,6 +163,7 @@ resource "google_kms_crypto_key_iam_member" "gcs_cmek" {
 # Bucket del estado remoto (ADR-0003) --------------------------------------
 
 resource "google_storage_bucket" "tfstate" {
+  # checkov:skip=CKV_GCP_62:El acceso se audita con Data Access audit logs del proyecto (google_project_iam_audit_config.seed).
   project                     = google_project.seed.project_id
   name                        = "${var.prefix}-tfstate-${random_id.suffix.hex}"
   location                    = upper(var.region)
@@ -223,6 +247,7 @@ resource "google_iam_workload_identity_pool" "github" {
 }
 
 resource "google_iam_workload_identity_pool_provider" "github" {
+  # checkov:skip=CKV_GCP_125:La condición sí amarra el claim sub a repo y rama; checkov no resuelve var.github_repo en análisis estático. Lo verifica tests/bootstrap.tftest.hcl.
   project                            = google_project.seed.project_id
   workload_identity_pool_id          = google_iam_workload_identity_pool.github.workload_identity_pool_id
   workload_identity_pool_provider_id = "github-actions"
@@ -235,8 +260,9 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     "attribute.ref"              = "assertion.ref"
   }
 
-  # Solo el repo del proyecto puede obtener credenciales.
-  attribute_condition = "assertion.repository == '${var.github_repo}'"
+  # Solo el repo del proyecto, y solo desde main o desde un PR, puede
+  # obtener credenciales. Otras ramas y forks quedan fuera.
+  attribute_condition = "assertion.sub == 'repo:${var.github_repo}:ref:refs/heads/main' || assertion.sub == 'repo:${var.github_repo}:pull_request'"
 
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"

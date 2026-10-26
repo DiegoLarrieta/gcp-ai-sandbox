@@ -10,7 +10,7 @@ El pipeline de GitHub Actions necesita crear recursos en GCP. Las llaves JSON de
 ## Decisión
 
 - Un Workload Identity Pool `github` en el proyecto semilla, con un proveedor OIDC que confía en `https://token.actions.githubusercontent.com`.
-- Condición del proveedor: solo se aceptan tokens cuyo `repository` sea exactamente el repo del proyecto.
+- Condición del proveedor sobre el claim `sub`: solo se aceptan tokens del repo del proyecto emitidos desde la rama `main` o desde un pull request. Otras ramas y forks no obtienen credenciales.
 - Una cuenta de servicio por etapa (`sa-org`, `sa-security`, `sa-networks`, `sa-ai-platform`, `sa-sandboxes`). El repo puede suplantar cada una con `roles/iam.workloadIdentityUser`.
 - Ninguna cuenta tiene `roles/owner` ni `roles/editor`; las pruebas lo verifican.
 - La org policy `iam.disableServiceAccountKeyCreation` se aplicará en la etapa 1.

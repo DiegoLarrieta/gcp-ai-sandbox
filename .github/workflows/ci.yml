@@ -1,0 +1,140 @@
+# Pipeline de PR. Corre completo sin credenciales de GCP (ADR-0005).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_VERSION: 1.11.4
+  TF_IN_AUTOMATION: "true"
+
+jobs:
+  estatico:
+    name: Formato, validación y lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive -diff
+
+      - name: terraform validate
+        run: |
+          for dir in stages/*/; do
+            if ls "$dir"*.tf >/dev/null 2>&1; then
+              echo "::group::$dir"
+              terraform -chdir="$dir" init -backend=false -input=false
+              terraform -chdir="$dir" validate
+              echo "::endgroup::"
+            fi
+          done
+
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.54.0
+
+      - name: tflint
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          tflint --init --config "$GITHUB_WORKSPACE/.tflint.hcl"
+          tflint --recursive --config "$GITHUB_WORKSPACE/.tflint.hcl" --format compact
+
+      - name: checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: terraform
+          quiet: true
+          compact: true
+
+  pruebas:
+    name: terraform test (${{ matrix.stage }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        stage: [0-bootstrap, 5-sandboxes]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: init
+        run: terraform -chdir=stages/${{ matrix.stage }} init -backend=false -input=false
+
+      - name: test con mock_provider
+        run: terraform -chdir=stages/${{ matrix.stage }} test
+
+  politicas:
+    name: Políticas (Conftest)
+    runs-on: ubuntu-latest
+    env:
+      CONFTEST_VERSION: 0.56.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar conftest
+        run: |
+          curl -sSL "https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz" \
+            | tar xz -C /usr/local/bin conftest
+
+      - name: Pruebas de las políticas
+        run: conftest verify -p policies
+
+      - name: Validar sandboxes solicitados
+        run: conftest test stages/5-sandboxes/teams -p policies/sandbox --output github
+
+  costos:
+    name: Estimación de costo (Infracost)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+    steps:
+      - name: Avisar si falta la API key
+        if: env.INFRACOST_API_KEY == ''
+        run: echo "::warning::Falta el secreto INFRACOST_API_KEY; se omite la estimación de costo."
+
+      - uses: actions/checkout@v4
+        if: env.INFRACOST_API_KEY != ''
+
+      - uses: infracost/actions/setup@v3
+        if: env.INFRACOST_API_KEY != ''
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Estimar costo desde el código
+        if: env.INFRACOST_API_KEY != ''
+        run: |
+          infracost breakdown --config-file infracost.yml \
+            --format json --out-file /tmp/infracost.json
+          infracost output --path /tmp/infracost.json --format table
+
+      - name: Comentar en el PR
+        if: env.INFRACOST_API_KEY != ''
+        run: |
+          infracost comment github --path /tmp/infracost.json \
+            --repo "$GITHUB_REPOSITORY" \
+            --github-token "${{ github.token }}" \
+            --pull-request "${{ github.event.pull_request.number }}" \
+            --behavior update

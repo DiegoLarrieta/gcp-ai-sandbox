@@ -18,7 +18,11 @@ Cuatro niveles de prueba:
 | Unitario | `terraform test` con `mock_provider` | No | Cada PR |
 | Integración | Terratest en proyecto efímero | Sí | Nocturno, desde el Sprint 3 |
 
-Los mocks (Terraform 1.7+) usan el esquema real de los proveedores `google` y `google-beta`, pero no llaman a ninguna API. Los valores calculados se generan o se fijan en `tests/mocks/*.tfmock.hcl`.
+Los mocks usan el esquema real de los proveedores `google` y `google-beta`, pero no llaman a ninguna API. Los valores calculados se generan o se fijan en `tests/mocks/*.tfmock.hcl`.
+
+Las pruebas requieren **Terraform 1.11 o superior** por `override_during`, que permite fijar valores calculados durante el plan. El código de las etapas sigue aceptando 1.9+. El pipeline usa 1.11.4.
+
+Los recursos con `prevent_destroy` (la llave KMS del estado) se prueban solo con `command = plan`, porque `terraform test` destruye al final lo que aplica.
 
 ## Qué prueban los mocks
 
