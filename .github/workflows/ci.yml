@@ -68,7 +68,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        stage: [0-bootstrap, 5-sandboxes]
+        stage: [0-bootstrap, 1-org, 2-security, 3-networks, 5-sandboxes]
     steps:
       - uses: actions/checkout@v4
 

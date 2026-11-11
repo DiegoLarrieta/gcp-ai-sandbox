@@ -6,8 +6,8 @@ Datacenter virtual en Google Cloud diseñado como **sandbox de IA**: un entorno 
 
 | Sprint | Fechas | Hito | Estado |
 |---|---|---|---|
-| 1. Descubrimiento y bases | 28 sep al 9 oct | Diseño y pipeline aprobados | En curso |
-| 2. Seguridad y red | 12 al 23 oct | Perímetro y red validados | Pendiente |
+| 1. Descubrimiento y bases | 28 sep al 9 oct | Diseño y pipeline aprobados | Completo |
+| 2. Seguridad y red | 12 al 23 oct | Perímetro y red validados | En curso |
 | 3. Datos y cómputo | 26 oct al 6 nov | Primer trabajo en GPU | Pendiente |
 | 4. Servicios de IA | 9 al 20 nov | Piloto RAG funcionando | Pendiente |
 | 5. Costos y entrega | 23 nov al 3 dic | Acta de aceptación firmada | Pendiente |

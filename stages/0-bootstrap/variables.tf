@@ -71,3 +71,15 @@ variable "tfstate_noncurrent_versions" {
     error_message = "Conserva al menos 3 versiones anteriores del estado."
   }
 }
+
+variable "root_folder_name" {
+  description = "Nombre de la carpeta raíz que aísla el reto dentro de la organización."
+  type        = string
+  default     = "gcp-ai-sandbox"
+}
+
+variable "github_environment" {
+  description = "Environment de GitHub que usa el job de despliegue."
+  type        = string
+  default     = "plataforma"
+}

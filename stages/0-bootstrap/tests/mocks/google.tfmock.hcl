@@ -47,3 +47,9 @@ mock_data "google_storage_project_service_account" {
     email_address = "service-222222222222@gs-project-accounts.iam.gserviceaccount.com"
   }
 }
+
+mock_resource "google_access_context_manager_access_policy" {
+  defaults = {
+    name = "accessPolicies/555555555555"
+  }
+}

@@ -3,6 +3,16 @@ output "seed_project_id" {
   value       = google_project.seed.project_id
 }
 
+output "root_folder" {
+  description = "Carpeta raíz del reto (folders/NNN)."
+  value       = google_folder.root.name
+}
+
+output "access_policy" {
+  description = "Política de Access Context Manager con alcance a la carpeta raíz."
+  value       = google_access_context_manager_access_policy.sandbox.name
+}
+
 output "bootstrap_folder" {
   description = "Carpeta bootstrap (folders/NNN)."
   value       = google_folder.bootstrap.name
