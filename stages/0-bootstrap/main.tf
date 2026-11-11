@@ -61,6 +61,7 @@ locals {
         "roles/compute.orgFirewallPolicyAdmin",
         "roles/dns.admin",
         "roles/servicenetworking.networksAdmin",
+        "roles/serviceusage.serviceUsageConsumer",
       ]
       org_roles = []
     }
@@ -77,6 +78,7 @@ locals {
       folder_roles = [
         "roles/resourcemanager.projectCreator",
         "roles/resourcemanager.projectDeleter",
+        "roles/serviceusage.serviceUsageConsumer",
       ]
       org_roles = []
     }
