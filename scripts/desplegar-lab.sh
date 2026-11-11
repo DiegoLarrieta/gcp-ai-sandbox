@@ -35,6 +35,9 @@ if [ -z "$PROJECT" ]; then
 fi
 gcloud billing projects link "$PROJECT" --billing-account="$BILLING" >/dev/null
 gcloud config set project "$PROJECT" >/dev/null 2>&1
+# Que gcloud y Terraform cobren las llamadas al proyecto del laboratorio.
+gcloud config set billing/quota_project "$PROJECT" >/dev/null 2>&1
+export GOOGLE_CLOUD_QUOTA_PROJECT=$PROJECT
 echo "  proyecto: $PROJECT"
 gcloud services enable cloudresourcemanager.googleapis.com serviceusage.googleapis.com storage.googleapis.com compute.googleapis.com iap.googleapis.com --project="$PROJECT"
 
