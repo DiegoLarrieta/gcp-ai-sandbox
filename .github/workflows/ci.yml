@@ -34,7 +34,7 @@ jobs:
 
       - name: terraform validate
         run: |
-          for dir in stages/*/; do
+          for dir in stages/*/ labs/*/; do
             if ls "$dir"*.tf >/dev/null 2>&1; then
               echo "::group::$dir"
               terraform -chdir="$dir" init -backend=false -input=false
@@ -68,7 +68,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        stage: [0-bootstrap, 1-org, 2-security, 3-networks, 5-sandboxes]
+        include:
+          - { stage: 0-bootstrap, path: stages/0-bootstrap }
+          - { stage: 1-org, path: stages/1-org }
+          - { stage: 2-security, path: stages/2-security }
+          - { stage: 3-networks, path: stages/3-networks }
+          - { stage: 5-sandboxes, path: stages/5-sandboxes }
+          - { stage: lab-proyecto, path: labs/proyecto }
     steps:
       - uses: actions/checkout@v4
 
@@ -77,10 +83,10 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: init
-        run: terraform -chdir=stages/${{ matrix.stage }} init -backend=false -input=false
+        run: terraform -chdir=${{ matrix.path }} init -backend=false -input=false
 
       - name: test con mock_provider
-        run: terraform -chdir=stages/${{ matrix.stage }} test
+        run: terraform -chdir=${{ matrix.path }} test
 
   politicas:
     name: Políticas (Conftest)
