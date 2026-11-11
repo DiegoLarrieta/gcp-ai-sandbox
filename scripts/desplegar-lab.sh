@@ -49,6 +49,10 @@ if ! gcloud storage buckets describe "gs://$BUCKET" >/dev/null 2>&1; then
 fi
 echo "  gs://$BUCKET"
 
+# El agente de Cloud Storage se crea la primera vez que se consulta; sin él
+# no se le puede dar acceso a la llave CMEK.
+gcloud storage service-agent --project="$PROJECT" >/dev/null && sleep 15
+
 paso "4. Terraform apply (con HA VPN)"
 cd "$ROOT/labs/proyecto"
 terraform init -input=false -reconfigure -backend-config="bucket=$BUCKET" >/dev/null
