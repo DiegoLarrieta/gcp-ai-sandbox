@@ -18,6 +18,26 @@ variables {
   owner           = "gcp-ai-plataforma@empresa.com"
 }
 
+# Los nombres de carpeta se fijan desde el plan para poder comparar
+# relaciones padre e hijo sin hacer apply.
+override_resource {
+  target          = google_folder.root
+  override_during = plan
+  values = {
+    name      = "folders/100000000001"
+    folder_id = "100000000001"
+  }
+}
+
+override_resource {
+  target          = google_folder.bootstrap
+  override_during = plan
+  values = {
+    name      = "folders/100000000002"
+    folder_id = "100000000002"
+  }
+}
+
 run "bucket_de_estado_seguro" {
   command = plan
 
@@ -65,13 +85,8 @@ run "wif_solo_acepta_el_repo_del_proyecto" {
   command = plan
 
   assert {
-    condition     = google_iam_workload_identity_pool_provider.github.attribute_condition == "assertion.sub == 'repo:DiegoLarrieta/gcp-ai-sandbox:ref:refs/heads/main' || assertion.sub == 'repo:DiegoLarrieta/gcp-ai-sandbox:pull_request'"
-    error_message = "WIF debe aceptar solo tokens del repo del proyecto, desde main o desde un PR."
-  }
-
-  assert {
-    condition     = strcontains(google_iam_workload_identity_pool_provider.github.attribute_condition, "assertion.sub == 'repo:DiegoLarrieta/gcp-ai-sandbox:ref:refs/heads/main'")
-    error_message = "WIF debe limitar las credenciales a la rama main y a los PR."
+    condition     = google_iam_workload_identity_pool_provider.github.attribute_condition == "assertion.sub == 'repo:DiegoLarrieta/gcp-ai-sandbox:ref:refs/heads/main' || assertion.sub == 'repo:DiegoLarrieta/gcp-ai-sandbox:pull_request' || assertion.sub == 'repo:DiegoLarrieta/gcp-ai-sandbox:environment:plataforma'"
+    error_message = "WIF debe aceptar solo tokens del repo del proyecto: main, PR o el environment de despliegue."
   }
 
   assert {
@@ -103,7 +118,7 @@ run "una_cuenta_por_etapa_sin_privilegios_amplios" {
 
   assert {
     condition = alltrue([
-      for b in google_organization_iam_member.stage :
+      for b in concat(values(google_organization_iam_member.stage), values(google_folder_iam_member.stage)) :
       !contains(["roles/owner", "roles/editor"], b.role)
     ])
     error_message = "Ninguna cuenta de etapa puede tener Owner o Editor."
@@ -189,6 +204,44 @@ run "outputs_con_valores_fijos" {
   assert {
     condition     = length(output.stage_service_accounts) == 5
     error_message = "Debe haber un correo por cada etapa."
+  }
+}
+
+run "aislado_en_carpeta_raiz" {
+  command = plan
+
+  assert {
+    condition     = google_folder.root.display_name == "gcp-ai-sandbox" && google_folder.root.parent == "organizations/123456789012"
+    error_message = "La carpeta raíz gcp-ai-sandbox debe colgar directo de la organización."
+  }
+
+  assert {
+    condition     = google_folder.bootstrap.parent == google_folder.root.name
+    error_message = "La carpeta bootstrap debe quedar dentro de la carpeta raíz."
+  }
+
+  assert {
+    condition     = toset([for b in google_organization_iam_member.stage : b.role]) == toset(["roles/orgpolicy.policyAdmin"])
+    error_message = "El único rol a nivel organización debe ser orgpolicy.policyAdmin (ADR-0006)."
+  }
+
+  assert {
+    condition     = alltrue([for b in google_folder_iam_member.stage : b.folder == google_folder.root.name])
+    error_message = "Los demás roles deben darse sobre la carpeta raíz."
+  }
+}
+
+run "politica_vpcsc_con_alcance" {
+  command = plan
+
+  assert {
+    condition     = google_access_context_manager_access_policy.sandbox.scopes == tolist([google_folder.root.name])
+    error_message = "La política de VPC-SC debe tener alcance solo a la carpeta raíz."
+  }
+
+  assert {
+    condition     = google_access_context_manager_access_policy_iam_member.security.role == "roles/accesscontextmanager.policyAdmin"
+    error_message = "La etapa 2 debe administrar solo esta política."
   }
 }
 

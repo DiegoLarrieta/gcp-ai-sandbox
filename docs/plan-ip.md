@@ -11,7 +11,7 @@ Todas las subredes son privadas (sin IP públicas) y usan Private Google Access.
 | `10.20.0.0/16` | Sandboxes y capacidad GPU en us-east4 | Región alterna, misma lógica |
 | `10.255.0.0/24` | Planos de control de GKE privados | Un `/28` por clúster, hasta 16 |
 | `100.64.0.0/10` | Rangos secundarios de GKE (pods y servicios) | Espacio CGNAT, no se anuncia a on-premises |
-| `172.16.0.0/12` | Reservado para on-premises | **Supuesto**, confirmar con el cliente |
+| `172.16.0.0/12` | Reservado para on-premises | **Supuesto**, confirmar con el cliente. En el reto, `172.16.0.0/24` es la VPC `vpc-onprem-sim` |
 | `169.254.0.0/24` | Sesiones BGP de HA VPN | Un `/30` por túnel |
 
 ## Plataforma común (`10.0.0.0/16`)
@@ -21,6 +21,7 @@ Todas las subredes son privadas (sin IP públicas) y usan Private Google Access.
 | hub-usc1 | `10.0.0.0/24` | net-hub | us-central1 |
 | hub-use4 | `10.0.1.0/24` | net-hub | us-east4 |
 | psc-endpoints | `10.0.8.0/24` | net-hub | us-central1 |
+| Endpoint PSC de APIs de Google (bundle vpc-sc) | `10.0.200.10/32` | net-hub | global |
 | ai-platform-gke | `10.0.16.0/20` | ai-platform | us-central1 |
 | ai-data-dataflow | `10.0.32.0/20` | ai-data | us-central1 |
 | psa-alloydb-cloudsql | `10.0.64.0/20` | net-hub (Private Service Access) | us-central1 |

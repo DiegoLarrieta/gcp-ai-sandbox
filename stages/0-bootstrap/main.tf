@@ -18,51 +18,78 @@ locals {
     "serviceusage.googleapis.com",
     "storage.googleapis.com",
     "sts.googleapis.com",
+    "accesscontextmanager.googleapis.com",
+    "cloudasset.googleapis.com",
+    "compute.googleapis.com",
+    "logging.googleapis.com",
+    "secretmanager.googleapis.com",
+    "servicenetworking.googleapis.com",
+    "dns.googleapis.com",
   ]
 
-  # Una cuenta de servicio por etapa, con sus roles a nivel organización.
-  # En el Sprint 2 se acotan a carpeta (ver ADR-0004).
+  # Una cuenta de servicio por etapa. Los roles se dan sobre la carpeta raíz
+  # gcp-ai-sandbox, no sobre la organización (ADR-0006). La única excepción
+  # es orgpolicy.policyAdmin, que Google solo permite a nivel organización.
   stages = {
     org = {
-      description = "Etapa 1: carpetas, org policies, logging y SCC"
-      org_roles = [
+      description = "Etapa 1: carpetas, proyectos base, org policies y logging"
+      folder_roles = [
         "roles/resourcemanager.folderAdmin",
-        "roles/orgpolicy.policyAdmin",
+        "roles/resourcemanager.projectCreator",
         "roles/logging.configWriter",
-        "roles/securitycenter.settingsAdmin",
+        "roles/serviceusage.serviceUsageAdmin",
       ]
+      org_roles = ["roles/orgpolicy.policyAdmin"]
     }
     security = {
       description = "Etapa 2: KMS, Secret Manager y VPC-SC"
-      org_roles = [
-        "roles/accesscontextmanager.policyAdmin",
+      folder_roles = [
+        "roles/browser",
         "roles/cloudkms.admin",
-        "roles/resourcemanager.projectCreator",
+        "roles/secretmanager.admin",
+        "roles/serviceusage.serviceUsageAdmin",
       ]
+      org_roles = []
     }
     networks = {
-      description = "Etapa 3: hub, spokes, DNS, VPN y PSC"
-      org_roles = [
+      description = "Etapa 3: Shared VPC, NAT, firewall, DNS, PSC y HA VPN"
+      folder_roles = [
+        "roles/browser",
         "roles/compute.xpnAdmin",
         "roles/compute.networkAdmin",
+        "roles/compute.securityAdmin",
+        "roles/compute.orgFirewallPolicyAdmin",
         "roles/dns.admin",
-        "roles/resourcemanager.projectCreator",
+        "roles/servicenetworking.networksAdmin",
+        "roles/serviceusage.serviceUsageConsumer",
       ]
+      org_roles = []
     }
     ai-platform = {
       description = "Etapa 4: datos, Vertex AI compartido, GKE GPU y guardrails"
-      org_roles = [
-        "roles/resourcemanager.projectCreator",
+      folder_roles = [
+        "roles/browser",
         "roles/serviceusage.serviceUsageAdmin",
       ]
+      org_roles = []
     }
     sandboxes = {
       description = "Etapa 5: un proyecto por equipo"
-      org_roles = [
+      folder_roles = [
         "roles/resourcemanager.projectCreator",
         "roles/resourcemanager.projectDeleter",
+        "roles/serviceusage.serviceUsageConsumer",
       ]
+      org_roles = []
     }
+  }
+
+  stage_folder_roles = {
+    for pair in flatten([
+      for stage, cfg in local.stages : [
+        for role in cfg.folder_roles : { stage = stage, role = role }
+      ]
+    ]) : "${pair.stage}/${pair.role}" => pair
   }
 
   stage_org_roles = {
@@ -74,18 +101,33 @@ locals {
   }
 
   # Etapas que crean proyectos necesitan asociarles la facturación.
-  billing_user_stages = ["security", "networks", "ai-platform", "sandboxes"]
+  billing_user_stages = ["org", "sandboxes"]
+
+  # GitHub cambia el claim sub cuando el job usa un environment.
+  wif_subjects = [
+    "repo:${var.github_repo}:ref:refs/heads/main",
+    "repo:${var.github_repo}:pull_request",
+    "repo:${var.github_repo}:environment:${var.github_environment}",
+  ]
 }
 
 resource "random_id" "suffix" {
   byte_length = 2
 }
 
-# Carpeta y proyecto semilla ------------------------------------------------
+# Carpeta raíz aislada y proyecto semilla ----------------------------------
+
+# Todo el reto cuelga de esta carpeta; nada se aplica al resto de la
+# organización (ADR-0006).
+resource "google_folder" "root" {
+  display_name        = var.root_folder_name
+  parent              = "organizations/${var.org_id}"
+  deletion_protection = true
+}
 
 resource "google_folder" "bootstrap" {
   display_name        = "bootstrap"
-  parent              = "organizations/${var.org_id}"
+  parent              = google_folder.root.name
   deletion_protection = true
 }
 
@@ -205,6 +247,14 @@ resource "google_service_account" "stage" {
   description  = each.value.description
 }
 
+resource "google_folder_iam_member" "stage" {
+  for_each = local.stage_folder_roles
+
+  folder = google_folder.root.name
+  role   = each.value.role
+  member = "serviceAccount:${google_service_account.stage[each.value.stage].email}"
+}
+
 resource "google_organization_iam_member" "stage" {
   for_each = local.stage_org_roles
 
@@ -260,9 +310,9 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     "attribute.ref"              = "assertion.ref"
   }
 
-  # Solo el repo del proyecto, y solo desde main o desde un PR, puede
-  # obtener credenciales. Otras ramas y forks quedan fuera.
-  attribute_condition = "assertion.sub == 'repo:${var.github_repo}:ref:refs/heads/main' || assertion.sub == 'repo:${var.github_repo}:pull_request'"
+  # Solo el repo del proyecto, y solo desde main, un PR o el environment de
+  # despliegue, puede obtener credenciales. Otras ramas y forks quedan fuera.
+  attribute_condition = join(" || ", [for s in local.wif_subjects : "assertion.sub == '${s}'"])
 
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"
@@ -275,4 +325,23 @@ resource "google_service_account_iam_member" "stage_wif" {
   service_account_id = google_service_account.stage[each.key].name
   role               = "roles/iam.workloadIdentityUser"
   member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_repo}"
+}
+
+# Política de VPC Service Controls con alcance (ADR-0006) -----------------
+
+# Una política "scoped" limitada a la carpeta raíz: el perímetro solo puede
+# incluir proyectos de esta carpeta y su administración se delega a la cuenta
+# de la etapa 2 sin dar permisos sobre el resto de la organización.
+resource "google_access_context_manager_access_policy" "sandbox" {
+  parent = "organizations/${var.org_id}"
+  title  = "gcp_ai_sandbox"
+  scopes = [google_folder.root.name]
+
+  depends_on = [google_project_service.seed]
+}
+
+resource "google_access_context_manager_access_policy_iam_member" "security" {
+  name   = google_access_context_manager_access_policy.sandbox.name
+  role   = "roles/accesscontextmanager.policyAdmin"
+  member = "serviceAccount:${google_service_account.stage["security"].email}"
 }
