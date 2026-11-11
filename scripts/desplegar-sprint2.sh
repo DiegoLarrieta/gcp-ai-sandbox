@@ -30,6 +30,17 @@ ADMIN=$(gcloud config get-value account 2>/dev/null)
 echo "Admin: $ADMIN"
 
 paso "2. Permisos del admin en la organización"
+if ! gcloud organizations get-iam-policy "$ORG" --format='value(etag)' >/dev/null 2>&1; then
+  cat <<MSG
+  $ADMIN no puede administrar los permisos de la organización $ORG.
+  Un super administrador de Google Workspace / Cloud Identity debe darse
+  el rol "Organization Administrator" en la consola:
+    IAM y administración > IAM > selector de recursos: rubro.ai (organización)
+    > Otorgar acceso > principal $ADMIN > rol Organization Administrator
+  Después vuelve a correr este script.
+MSG
+  exit 1
+fi
 for role in roles/resourcemanager.folderAdmin roles/resourcemanager.projectCreator roles/accesscontextmanager.policyAdmin; do
   gcloud organizations add-iam-policy-binding "$ORG" --member="user:$ADMIN" --role="$role" --condition=None --quiet >/dev/null
   echo "  $role"
